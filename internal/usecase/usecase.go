@@ -1,22 +1,32 @@
 package usecase
 
 import (
-	"tinyurl/internal/repository"
+	"github.com/teris-io/shortid"
 )
 
 type Usecase struct {
-	st *repository.Storage
+	repo Repo
 }
 
-func NewUsecase(st *repository.Storage) *Usecase {
+type Repo interface {
+	AddToDB(id, recievedLink string) error
+	GetFromDB(long_link string) (string, error)
+}
+
+func NewUsecase(repo Repo) *Usecase {
 	return &Usecase{
-		st: st,
+		repo: repo,
 	}
 }
 
 func (uc *Usecase) GetLink(link string) (string, error) {
-	return uc.st.GetFromDB(link)
+	return uc.repo.GetFromDB(link)
 }
+
 func (uc *Usecase) AddLink(id, link string) error {
-	return uc.st.AddToDB(id, link)
+	return uc.repo.AddToDB(id, link)
+}
+
+func (uc *Usecase) CreateId() (string, error) {
+	return shortid.Generate()
 }
