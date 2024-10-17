@@ -4,6 +4,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 type App struct {
@@ -12,8 +14,7 @@ type App struct {
 
 type Logic interface {
 	GetLink(link string) (string, error)
-	AddLink(id, link string) error
-	CreateId() (string, error)
+	AddLink(link string) (string, error)
 }
 
 func NewApp(logic Logic) *App {
@@ -22,7 +23,27 @@ func NewApp(logic Logic) *App {
 	}
 }
 
-func (app *App) GetHandler(w http.ResponseWriter, r *http.Request) {
+func (app *App) ApplyRouts() *httprouter.Router {
+	router := httprouter.New()
+	router.GET("/", app.GetLinkHandler)
+	router.POST("/", app.AddLinkHandler)
+
+	router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Access-Control-Request-Method") != "" {
+			// Set CORS headers
+			header := w.Header()
+			header.Set("Access-Control-Allow-Methods", header.Get("Allow"))
+			header.Set("Access-Control-Allow-Origin", "*")
+		}
+
+		// Adjust status code to 204
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	return router
+}
+
+func (app *App) GetLinkHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	bytesBody, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -38,10 +59,10 @@ func (app *App) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/"+link, http.StatusSeeOther)
+	http.Redirect(w, r, link, http.StatusSeeOther)
 }
 
-func (app *App) PostHandler(w http.ResponseWriter, r *http.Request) {
+func (app *App) AddLinkHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	bytesBody, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -58,14 +79,10 @@ func (app *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := app.logic.CreateId()
+	id, err := app.logic.AddLink(recievedLink)
 	if err != nil {
 		log.Println(err)
-		return
 	}
 
-	err = app.logic.AddLink(id, recievedLink)
-	if err != nil {
-		log.Println(err)
-	}
+	w.Write([]byte(id))
 }

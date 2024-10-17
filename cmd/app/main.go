@@ -7,8 +7,6 @@ import (
 	"tinyurl/internal/delivery"
 	"tinyurl/internal/repository"
 	"tinyurl/internal/usecase"
-
-	"github.com/julienschmidt/httprouter"
 )
 
 func main() {
@@ -23,10 +21,8 @@ func main() {
 	uc := usecase.NewUsecase(st)
 	app := delivery.NewApp(uc)
 
-	router := httprouter.New()
-	router.HandlerFunc("GET", "/", app.GetHandler)
-	router.HandlerFunc("POST", "/", app.PostHandler)
+	router := app.ApplyRouts()
 
-	err = http.ListenAndServe(":3333", nil)
+	err = http.ListenAndServe(":3333", router)
 	log.Fatal(err)
 }
