@@ -25,7 +25,7 @@ func NewApp(logic Logic) *App {
 
 func (app *App) ApplyRouts() *httprouter.Router {
 	router := httprouter.New()
-	router.GET("/", app.GetLinkHandler)
+	router.GET("/:linkID", app.GetLinkHandler)
 	router.POST("/", app.AddLinkHandler)
 
 	router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +35,6 @@ func (app *App) ApplyRouts() *httprouter.Router {
 			header.Set("Access-Control-Allow-Methods", header.Get("Allow"))
 			header.Set("Access-Control-Allow-Origin", "*")
 		}
-
 		// Adjust status code to 204
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -43,16 +42,8 @@ func (app *App) ApplyRouts() *httprouter.Router {
 	return router
 }
 
-func (app *App) GetLinkHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-
-	bytesBody, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Println(err)
-		w.Write([]byte("Bad request body"))
-		return
-	}
-
-	recievedLink := (string)(bytesBody)
+func (app *App) GetLinkHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	recievedLink := ps.ByName("linkID")
 	link, err := app.logic.GetLink(recievedLink)
 	if err != nil {
 		log.Println(err)
@@ -63,7 +54,6 @@ func (app *App) GetLinkHandler(w http.ResponseWriter, r *http.Request, _ httprou
 }
 
 func (app *App) AddLinkHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-
 	bytesBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
@@ -83,6 +73,5 @@ func (app *App) AddLinkHandler(w http.ResponseWriter, r *http.Request, _ httprou
 	if err != nil {
 		log.Println(err)
 	}
-
 	w.Write([]byte(id))
 }
