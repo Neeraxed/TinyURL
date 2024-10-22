@@ -21,7 +21,7 @@ func main() {
 	uc := usecase.NewUsecase(st)
 	app := delivery.NewApp(uc)
 
-	router := app.ApplyRouts()
+	router := app.ApplyRoutes()
 
 	err = http.ListenAndServe(":3333", router)
 	log.Fatal(err)

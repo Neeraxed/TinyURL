@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"tinyurl/pkg/middleware"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -23,10 +24,13 @@ func NewApp(logic Logic) *App {
 	}
 }
 
-func (app *App) ApplyRouts() *httprouter.Router {
+func (app *App) ApplyRoutes() *httprouter.Router {
+	mo := middleware.NewOnion()
+	mo.AppendMiddleware(mo.LogRequestResponse)
+
 	router := httprouter.New()
-	router.GET("/:linkID", app.GetLinkHandler)
-	router.POST("/", app.AddLinkHandler)
+	router.GET("/:linkID", mo.Apply(app.GetLinkHandler))
+	router.POST("/", mo.Apply(app.AddLinkHandler))
 
 	router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Access-Control-Request-Method") != "" {
