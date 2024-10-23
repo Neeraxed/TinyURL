@@ -2,35 +2,36 @@ package delivery
 
 import (
 	"io"
-	"log"
 	"net/http"
+	"time"
 	"tinyurl/pkg/middleware"
 
 	"github.com/julienschmidt/httprouter"
+	"go.uber.org/zap"
 )
 
 type App struct {
 	logic Logic
+	log   *zap.Logger
 }
 
 type Logic interface {
-	GetLink(link string) (string, error)
+	GetLink(id string) (string, error)
 	AddLink(link string) (string, error)
 }
 
-func NewApp(logic Logic) *App {
+func NewApp(logic Logic, log *zap.Logger) *App {
 	return &App{
 		logic: logic,
+		log:   log,
 	}
 }
 
-func (app *App) ApplyRoutes() *httprouter.Router {
-	mo := middleware.NewOnion()
-	mo.AppendMiddleware(mo.LogRequestResponse)
+func (app *App) ApplyRoutes(o *middleware.Onion) *httprouter.Router {
 
 	router := httprouter.New()
-	router.GET("/:linkID", mo.Apply(app.GetLinkHandler))
-	router.POST("/", mo.Apply(app.AddLinkHandler))
+	router.GET("/:linkID", o.Apply(app.GetLinkHandler))
+	router.POST("/", o.Apply(app.AddLinkHandler))
 
 	router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Access-Control-Request-Method") != "" {
@@ -47,10 +48,14 @@ func (app *App) ApplyRoutes() *httprouter.Router {
 }
 
 func (app *App) GetLinkHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	recievedLink := ps.ByName("linkID")
-	link, err := app.logic.GetLink(recievedLink)
+	recievedID := ps.ByName("linkID")
+	link, err := app.logic.GetLink(recievedID)
 	if err != nil {
-		log.Println(err)
+		app.log.Error("Failed to get link from database",
+			zap.String("id", recievedID),
+			zap.String("message", err.Error()),
+			zap.Time("time", time.Now()),
+		)
 		return
 	}
 
@@ -60,22 +65,31 @@ func (app *App) GetLinkHandler(w http.ResponseWriter, r *http.Request, ps httpro
 func (app *App) AddLinkHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	bytesBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Println(err)
-		w.Write([]byte("Bad request body"))
+		app.log.Error("Bad request body",
+			zap.String("message", err.Error()),
+			zap.Time("time", time.Now()),
+		)
 		return
 	}
 	recievedLink := (string)(bytesBody)
 
 	link, err := app.logic.GetLink(recievedLink)
 	if err == nil {
-		log.Println("Existing link")
+		app.log.Info("Link already exists in database",
+			zap.String("link", link),
+			zap.Time("time", time.Now()),
+		)
 		w.Write([]byte(link))
 		return
 	}
 
 	id, err := app.logic.AddLink(recievedLink)
 	if err != nil {
-		log.Println(err)
+		app.log.Error("Failed to add link to database",
+			zap.String("link", recievedLink),
+			zap.String("id", id),
+			zap.Time("time", time.Now()),
+		)
 	}
 	w.Write([]byte(id))
 }

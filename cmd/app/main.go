@@ -1,28 +1,42 @@
 package main
 
 import (
-	"log"
 	"net/http"
 
 	"tinyurl/internal/delivery"
 	"tinyurl/internal/repository"
 	"tinyurl/internal/usecase"
+	"tinyurl/pkg/middleware"
+
+	"go.uber.org/zap"
 )
 
 func main() {
+	logger, _ := zap.NewDevelopment()
+
 	st := repository.NewStorage()
 	err := st.Init()
 	if err != nil {
-		log.Println("Failed to initialize storage: " + err.Error())
+		logger.Fatal("Failed to initialize storage",
+			zap.String("message", err.Error()),
+		)
 		return
 	}
 	defer st.Close()
 
-	uc := usecase.NewUsecase(st)
-	app := delivery.NewApp(uc)
+	uc := usecase.NewUsecase(st, logger)
+	app := delivery.NewApp(uc, logger)
 
-	router := app.ApplyRoutes()
+	onion := middleware.NewOnion(logger)
+
+	onion.AppendMiddleware(
+		onion.Timer,
+		onion.LogRequestResponse)
+
+	router := app.ApplyRoutes(onion)
 
 	err = http.ListenAndServe(":3333", router)
-	log.Fatal(err)
+	logger.Fatal("Server died",
+		zap.String("message", err.Error()),
+	)
 }
