@@ -2,13 +2,14 @@ package repository
 
 import (
 	"database/sql"
+	"os"
 
 	_ "github.com/lib/pq"
+	"go.uber.org/zap"
 )
 
 type Storage struct {
-	config Config
-	db     *sql.DB
+	db *sql.DB
 }
 
 type Config struct {
@@ -19,10 +20,17 @@ func NewStorage() *Storage {
 	return &Storage{}
 }
 
-func (st *Storage) Init() error {
+func ReadConfig(log *zap.Logger) *Config {
+	dbuser := os.Getenv("DBUSER")
+	dbpass := os.Getenv("DBPASSWORD")
 
-	st.config.connStr = "user=tester password=tester dbname=tester sslmode=disable"
-	db, err := sql.Open("postgres", st.config.connStr)
+	return &Config{
+		connStr: "user=" + dbuser + " password=" + dbpass + " dbname=tester sslmode=disable",
+	}
+}
+
+func (st *Storage) Init(config *Config) error {
+	db, err := sql.Open("postgres", config.connStr)
 	if err == nil {
 		st.db = db
 	}
